@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_DATABASE: invenpilot_test
+          MYSQL_USER: invenpilot_test
+          MYSQL_PASSWORD: invenpilot-test-only
+          MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: bcmath, pdo_mysql, pdo_sqlite
+          coverage: none
+      - run: composer validate --strict
+      - run: composer install --no-interaction --prefer-dist
+      - run: composer audit --locked
+      - run: cp .env.example .env && php artisan key:generate
+      - run: vendor/bin/pint --test
+      - run: php artisan test
+      - run: php artisan test
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_DATABASE: invenpilot_test
+          DB_USERNAME: invenpilot_test
+          DB_PASSWORD: invenpilot-test-only
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm audit --audit-level=high
+      - run: npm run build
+
+  browser:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm --prefix frontend ci
+      - run: npx playwright install --with-deps chromium
+        working-directory: frontend
+      - name: Start disposable application
+        run: |
+          umask 077
+          printf 'MYSQL_PASSWORD=%s\nAPP_KEY=base64:%s\n' "$(openssl rand -hex 24)" "$(openssl rand -base64 32)" > .env
+          docker compose --profile app up -d --wait --build
+          docker compose --profile app exec -T app php artisan migrate --force
+      - run: npm --prefix frontend run test:browser
+      - if: always()
+        run: docker compose --profile app down -v

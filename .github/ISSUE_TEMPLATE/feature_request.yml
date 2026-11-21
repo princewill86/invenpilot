@@ -1,0 +1,14 @@
+name: Feature request
+description: Describe a business workflow you would like InvenPilot to support.
+title: "[Feature] "
+body:
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow and expected outcome
+    validations:
+      required: true
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on permissions, inventory, or reporting

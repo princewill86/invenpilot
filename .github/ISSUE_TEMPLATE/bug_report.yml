@@ -1,0 +1,21 @@
+name: Bug report
+description: Report a reproducible problem using test data.
+title: "[Bug] "
+body:
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      description: Omit passwords, session data, invitation links, and private business records.
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Expected and actual outcomes
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App version or commit
